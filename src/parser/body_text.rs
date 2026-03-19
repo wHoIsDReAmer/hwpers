@@ -31,6 +31,8 @@ impl BodyTextParser {
                 Err(_) => break, // Stop parsing on error
             };
 
+            current_section.debug_tags.push(record.tag_id());
+
             match HwpTag::from_u16(record.tag_id()) {
                 // Tag 0x42 (HWPTAG_PARA_HEADER) - Paragraph header with properties
                 Some(HwpTag::SectionDefine) => {

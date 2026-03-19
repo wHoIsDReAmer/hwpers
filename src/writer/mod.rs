@@ -1074,6 +1074,7 @@ impl HwpWriter {
             paragraphs: Vec::new(),
             section_def: None,
             page_def: None,
+            debug_tags: Vec::new(),
         };
 
         BodyText {

@@ -568,6 +568,7 @@ impl HwpxWriter {
                     paragraphs: vec![paragraph],
                     section_def: None,
                     page_def: None,
+                    debug_tags: Vec::new(),
                 }],
             });
         } else if let Some(body) = self.document.body_texts.first_mut() {

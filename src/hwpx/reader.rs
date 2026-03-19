@@ -237,6 +237,7 @@ impl HwpxReader {
                         paragraphs,
                         section_def: None,
                         page_def: None,
+                        debug_tags: Vec::new(),
                     }],
                 }
             })

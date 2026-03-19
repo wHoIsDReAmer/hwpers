@@ -6,6 +6,8 @@ pub struct Section {
     pub paragraphs: Vec<Paragraph>,
     pub section_def: Option<crate::model::SectionDef>,
     pub page_def: Option<crate::model::PageDef>,
+    /// Debug: all raw tag IDs seen during parsing
+    pub debug_tags: Vec<u16>,
 }
 
 #[derive(Debug, Default)]
