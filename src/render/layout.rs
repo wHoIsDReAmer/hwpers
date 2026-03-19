@@ -201,22 +201,26 @@ impl<'a> LayoutEngine<'a> {
         let mut current_y = y;
 
         for (idx, line_seg) in line_segs.line_segments.iter().enumerate() {
-            // Get text range for this line
-            let start = if idx == 0 {
+            // Get text range for this line (positions are character indices)
+            let start_char = if idx == 0 {
                 0
             } else {
                 line_segs.line_segments[idx - 1].text_start_position as usize
             };
-            let end = line_seg.text_start_position as usize;
+            let end_char = line_seg.text_start_position as usize;
 
-            if end > text.len() {
+            let total_chars = text.chars().count();
+            if end_char > total_chars {
                 break;
             }
 
-            let line_text = &text[start..end];
+            // Convert character indices to byte indices for safe UTF-8 slicing
+            let start_byte = Self::char_index_to_byte_index(text, start_char);
+            let end_byte = Self::char_index_to_byte_index(text, end_char);
+            let line_text = &text[start_byte..end_byte];
 
             // Create text runs for this line
-            let runs = self.create_text_runs_for_line(line_text, paragraph, x, start as u32);
+            let runs = self.create_text_runs_for_line(line_text, paragraph, x, start_char as u32);
 
             lines.push(RenderedLine {
                 y: current_y + line_seg.line_vertical_position,
@@ -282,6 +286,14 @@ impl<'a> LayoutEngine<'a> {
         lines
     }
 
+    /// Convert a character index (UTF-16 based) to a byte index in a UTF-8 string
+    fn char_index_to_byte_index(s: &str, char_idx: usize) -> usize {
+        s.char_indices()
+            .nth(char_idx)
+            .map(|(byte_pos, _)| byte_pos)
+            .unwrap_or(s.len())
+    }
+
     /// Create text runs for a line of text
     fn create_text_runs_for_line(
         &self,
@@ -294,23 +306,29 @@ impl<'a> LayoutEngine<'a> {
 
         if let Some(char_shapes) = &paragraph.char_shapes {
             // Create runs based on character shape changes
+            // Positions from ParaCharShape are character indices (not byte offsets)
             let mut current_x = x;
+            let text_offset = text_offset as usize;
+            let total_chars = line_text.chars().count();
 
             for (idx, pos_shape) in char_shapes.char_positions.iter().enumerate() {
-                let start = pos_shape.position as usize;
-                let end = if idx + 1 < char_shapes.char_positions.len() {
+                let start_char = pos_shape.position as usize;
+                let end_char = if idx + 1 < char_shapes.char_positions.len() {
                     char_shapes.char_positions[idx + 1].position as usize
                 } else {
-                    line_text.len() + text_offset as usize
+                    total_chars + text_offset
                 };
 
-                if start >= text_offset as usize && (start - text_offset as usize) < line_text.len()
-                {
-                    let run_start = (start - text_offset as usize).min(line_text.len());
-                    let run_end = (end - text_offset as usize).min(line_text.len());
+                if start_char >= text_offset && (start_char - text_offset) < total_chars {
+                    let run_start_char = (start_char - text_offset).min(total_chars);
+                    let run_end_char = (end_char - text_offset).min(total_chars);
 
-                    if run_start < run_end {
-                        let run_text = &line_text[run_start..run_end];
+                    if run_start_char < run_end_char {
+                        // Convert character indices to byte indices for safe slicing
+                        let run_start_byte = Self::char_index_to_byte_index(line_text, run_start_char);
+                        let run_end_byte = Self::char_index_to_byte_index(line_text, run_end_char);
+
+                        let run_text = &line_text[run_start_byte..run_end_byte];
                         let char_shape = self
                             .document
                             .get_char_shape(pos_shape.char_shape_id as usize);
