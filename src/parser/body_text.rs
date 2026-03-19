@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::model::{
     CtrlHeader, ListHeader, PageDef, ParaCharShape, ParaLineSeg, ParaText, Paragraph, Section,
-    SectionDef, Table,
+    SectionDef, Table, TableCell,
 };
 use crate::parser::record::{HwpTag, Record};
 use crate::reader::StreamReader;
@@ -23,6 +23,10 @@ impl BodyTextParser {
         let mut current_paragraph: Option<Paragraph> = None;
 
         let mut first_section = true;
+        // Track table context: index of the paragraph that owns the current table
+        let mut table_para_idx: Option<usize> = None;
+        let mut table_cell_idx: usize = 0;
+        let mut table_expected_cells: usize = 0;
 
         while reader.remaining() >= 4 {
             // Need at least 4 bytes for record header
@@ -89,7 +93,57 @@ impl BodyTextParser {
 
                 // Tag 0x48 (HWPTAG_LIST_HEADER) - enum: HiddenComment
                 Some(HwpTag::HiddenComment) => {
-                    if let Some(ref mut para) = current_paragraph {
+                    if let Some(tpi) = table_para_idx {
+                        if table_cell_idx < table_expected_cells {
+                            // Parse cell from LIST_HEADER record
+                            // HWP 5.0 cell LIST_HEADER: nPara(u16) + properties(u32) + cell fields
+                            let mut rdr = record.data_reader();
+                            if rdr.remaining() >= 32 {
+                                let _para_count = rdr.read_u16().unwrap_or(0);
+                                let _properties = rdr.read_u32().unwrap_or(0);
+                                let col_addr = rdr.read_u16().unwrap_or(0);
+                                let row_addr = rdr.read_u16().unwrap_or(0);
+                                let col_span = rdr.read_u16().unwrap_or(0);
+                                let row_span = rdr.read_u16().unwrap_or(0);
+                                let width = rdr.read_u32().unwrap_or(0);
+                                let height = rdr.read_u32().unwrap_or(0);
+                                let left_margin = rdr.read_u16().unwrap_or(0);
+                                let right_margin = rdr.read_u16().unwrap_or(0);
+                                let top_margin = rdr.read_u16().unwrap_or(0);
+                                let bottom_margin = rdr.read_u16().unwrap_or(0);
+                                let border_fill_id = rdr.read_u16().unwrap_or(0);
+
+                                let cell = TableCell {
+                                    list_header_id: 0,
+                                    col_span,
+                                    row_span,
+                                    width,
+                                    height,
+                                    left_margin,
+                                    right_margin,
+                                    top_margin,
+                                    bottom_margin,
+                                    border_fill_id,
+                                    text_width: width.saturating_sub(
+                                        (left_margin as u32) + (right_margin as u32),
+                                    ),
+                                    field_name: String::new(),
+                                    paragraph_list_id: None,
+                                    cell_address: (row_addr, col_addr),
+                                };
+
+                                if let Some(ref mut table) =
+                                    current_section.paragraphs[tpi].table_data
+                                {
+                                    table.cells.push(cell);
+                                }
+                                table_cell_idx += 1;
+                                if table_cell_idx >= table_expected_cells {
+                                    table_para_idx = None;
+                                }
+                            }
+                        }
+                    } else if let Some(ref mut para) = current_paragraph {
                         para.list_header = ListHeader::from_record(&record).ok();
                     }
                 }
@@ -102,7 +156,16 @@ impl BodyTextParser {
                 // Tag 0x4D (HWPTAG_TABLE) - enum: PageHide
                 Some(HwpTag::PageHide) => {
                     if let Some(ref mut para) = current_paragraph {
-                        para.table_data = Table::from_record(&record).ok();
+                        if let Ok(table) = Table::from_record(&record) {
+                            let expected = (table.rows as usize) * (table.cols as usize);
+                            para.table_data = Some(table);
+                            // Push table paragraph now so cell LIST_HEADERs can reference it
+                            let para = current_paragraph.take().unwrap();
+                            current_section.paragraphs.push(para);
+                            table_para_idx = Some(current_section.paragraphs.len() - 1);
+                            table_cell_idx = 0;
+                            table_expected_cells = expected;
+                        }
                     }
                 }
 
@@ -149,7 +212,55 @@ impl BodyTextParser {
                     }
                 }
                 Some(HwpTag::ListHeader) => {
-                    if let Some(ref mut para) = current_paragraph {
+                    if let Some(tpi) = table_para_idx {
+                        if table_cell_idx < table_expected_cells {
+                            let mut rdr = record.data_reader();
+                            if rdr.remaining() >= 32 {
+                                let _para_count = rdr.read_u16().unwrap_or(0);
+                                let _properties = rdr.read_u32().unwrap_or(0);
+                                let col_addr = rdr.read_u16().unwrap_or(0);
+                                let row_addr = rdr.read_u16().unwrap_or(0);
+                                let col_span = rdr.read_u16().unwrap_or(0);
+                                let row_span = rdr.read_u16().unwrap_or(0);
+                                let width = rdr.read_u32().unwrap_or(0);
+                                let height = rdr.read_u32().unwrap_or(0);
+                                let left_margin = rdr.read_u16().unwrap_or(0);
+                                let right_margin = rdr.read_u16().unwrap_or(0);
+                                let top_margin = rdr.read_u16().unwrap_or(0);
+                                let bottom_margin = rdr.read_u16().unwrap_or(0);
+                                let border_fill_id = rdr.read_u16().unwrap_or(0);
+
+                                let cell = TableCell {
+                                    list_header_id: 0,
+                                    col_span,
+                                    row_span,
+                                    width,
+                                    height,
+                                    left_margin,
+                                    right_margin,
+                                    top_margin,
+                                    bottom_margin,
+                                    border_fill_id,
+                                    text_width: width.saturating_sub(
+                                        (left_margin as u32) + (right_margin as u32),
+                                    ),
+                                    field_name: String::new(),
+                                    paragraph_list_id: None,
+                                    cell_address: (row_addr, col_addr),
+                                };
+
+                                if let Some(ref mut table) =
+                                    current_section.paragraphs[tpi].table_data
+                                {
+                                    table.cells.push(cell);
+                                }
+                                table_cell_idx += 1;
+                                if table_cell_idx >= table_expected_cells {
+                                    table_para_idx = None;
+                                }
+                            }
+                        }
+                    } else if let Some(ref mut para) = current_paragraph {
                         para.list_header = ListHeader::from_record(&record).ok();
                     }
                 }
@@ -158,7 +269,15 @@ impl BodyTextParser {
                 }
                 Some(HwpTag::Table) => {
                     if let Some(ref mut para) = current_paragraph {
-                        para.table_data = Table::from_record(&record).ok();
+                        if let Ok(table) = Table::from_record(&record) {
+                            let expected = (table.rows as usize) * (table.cols as usize);
+                            para.table_data = Some(table);
+                            let para = current_paragraph.take().unwrap();
+                            current_section.paragraphs.push(para);
+                            table_para_idx = Some(current_section.paragraphs.len() - 1);
+                            table_cell_idx = 0;
+                            table_expected_cells = expected;
+                        }
                     }
                 }
 

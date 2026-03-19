@@ -259,10 +259,12 @@ impl TableCell {
 }
 
 impl Table {
+    /// Parse TABLE record from HWP 5.0 body text (tag 0x4D)
+    /// Note: cell data comes from LIST_HEADER records, not from this record.
     pub fn from_record(record: &crate::parser::record::Record) -> crate::error::Result<Self> {
         let mut reader = record.data_reader();
 
-        if reader.remaining() < 20 {
+        if reader.remaining() < 10 {
             return Err(crate::error::HwpError::ParseError(format!(
                 "Table record too small: {} bytes",
                 reader.remaining()
@@ -273,52 +275,15 @@ impl Table {
         let rows = reader.read_u16()?;
         let cols = reader.read_u16()?;
         let cell_spacing = reader.read_u16()?;
-        let left_margin = reader.read_i32()?;
-        let right_margin = reader.read_i32()?;
-        let top_margin = reader.read_i32()?;
-        let bottom_margin = reader.read_i32()?;
 
-        // Read cells if available
-        let mut cells = Vec::new();
-        let total_cells = (rows * cols) as usize;
+        // HWP 5.0 margins are u16, not i32
+        let left_margin = if reader.remaining() >= 2 { reader.read_u16()? as i32 } else { 0 };
+        let right_margin = if reader.remaining() >= 2 { reader.read_u16()? as i32 } else { 0 };
+        let top_margin = if reader.remaining() >= 2 { reader.read_u16()? as i32 } else { 0 };
+        let bottom_margin = if reader.remaining() >= 2 { reader.read_u16()? as i32 } else { 0 };
 
-        for i in 0..total_cells {
-            if reader.remaining() < 34 {
-                break; // Not enough data for a complete cell
-            }
-
-            let row = (i / cols as usize) as u16;
-            let col = (i % cols as usize) as u16;
-
-            let cell = TableCell {
-                list_header_id: reader.read_u32()?,
-                col_span: reader.read_u16()?,
-                row_span: reader.read_u16()?,
-                width: reader.read_u32()?,
-                height: reader.read_u32()?,
-                left_margin: reader.read_u16()?,
-                right_margin: reader.read_u16()?,
-                top_margin: reader.read_u16()?,
-                bottom_margin: reader.read_u16()?,
-                border_fill_id: reader.read_u16()?,
-                text_width: reader.read_u32()?,
-                field_name: {
-                    if reader.remaining() >= 2 {
-                        let name_len = reader.read_u16()? as usize;
-                        if reader.remaining() >= name_len * 2 {
-                            reader.read_string(name_len * 2)?
-                        } else {
-                            format!("Cell_{}", i)
-                        }
-                    } else {
-                        format!("Cell_{}", i)
-                    }
-                },
-                paragraph_list_id: None,
-                cell_address: (row, col),
-            };
-            cells.push(cell);
-        }
+        // Remaining data: row sizes (rows * u16), border fill ID, etc.
+        // Cell data comes from LIST_HEADER records, not parsed here.
 
         Ok(Self {
             properties,
@@ -329,7 +294,7 @@ impl Table {
             right_margin,
             top_margin,
             bottom_margin,
-            cells,
+            cells: Vec::new(), // Populated later from LIST_HEADER records
         })
     }
 }
