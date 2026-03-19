@@ -70,11 +70,9 @@ impl BodyTextParser {
                     }
                 }
 
-                // Tag 0x45 (HWPTAG_PARA_LINE_SEG) - Line segment info
+                // Tag 0x45 - Skip for now (line segment parsing may produce bad data)
                 Some(HwpTag::SheetControl) => {
-                    if let Some(ref mut para) = current_paragraph {
-                        para.line_segments = ParaLineSeg::from_record(&record).ok();
-                    }
+                    // Intentionally skipped - let layout engine calculate lines dynamically
                 }
 
                 // Standard paragraph records (if they exist)
