@@ -100,6 +100,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: None,
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         // Get the current section and add paragraph
@@ -157,6 +158,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: None,
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         // Get the current section and add paragraph
@@ -224,6 +226,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: None,
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         // Add paragraph to current section
@@ -329,6 +332,7 @@ impl HwpWriter {
                 picture_data: None,
                 text_box_data: None,
                 hyperlinks: Vec::new(),
+            in_table: false,
             };
 
             // Add paragraph to current section
@@ -516,6 +520,7 @@ impl HwpWriter {
             picture_data: Some(picture),
             text_box_data: None,
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         // Add the picture control paragraph to the document
@@ -646,6 +651,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: None,
             hyperlinks: vec![hyperlink],
+            in_table: false,
         };
 
         // Add the paragraph to the document
@@ -752,6 +758,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: None,
             hyperlinks,
+            in_table: false,
         };
 
         // Add the paragraph to the document
@@ -877,6 +884,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: None,
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         // Add the paragraph to the document
@@ -942,6 +950,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: None,
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         // Add the paragraph to the document
@@ -1499,6 +1508,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: Some(text_box),
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         if let Some(body_text) = self.document.body_texts.get_mut(self.current_section_idx) {
@@ -1553,6 +1563,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: Some(text_box),
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         if let Some(body_text) = self.document.body_texts.get_mut(self.current_section_idx) {
@@ -1611,6 +1622,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: Some(text_box),
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         if let Some(body_text) = self.document.body_texts.get_mut(self.current_section_idx) {
@@ -1664,6 +1676,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: Some(text_box),
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         if let Some(body_text) = self.document.body_texts.get_mut(self.current_section_idx) {
@@ -1723,6 +1736,7 @@ impl HwpWriter {
             picture_data: None,
             text_box_data: Some(text_box),
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         if let Some(body_text) = self.document.body_texts.get_mut(self.current_section_idx) {

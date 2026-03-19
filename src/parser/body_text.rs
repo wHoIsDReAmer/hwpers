@@ -23,6 +23,8 @@ impl BodyTextParser {
         let mut current_paragraph: Option<Paragraph> = None;
 
         let mut first_section = true;
+        // Track table context via record level
+        let mut table_level: Option<u8> = None;
 
         while reader.remaining() >= 4 {
             // Need at least 4 bytes for record header
@@ -41,13 +43,26 @@ impl BodyTextParser {
                         current_section.section_def = SectionDef::from_record(&record).ok();
                         first_section = false;
                     }
+                    // Check if this paragraph is inside a table cell
+                    let is_cell = if let Some(tl) = table_level {
+                        if record.header.level <= tl {
+                            // Same or shallower level = no longer in table
+                            table_level = None;
+                            false
+                        } else {
+                            true
+                        }
+                    } else {
+                        false
+                    };
                     // Push previous paragraph and start a new one
                     if let Some(para) = current_paragraph.take() {
                         current_section.paragraphs.push(para);
                     }
                     // Parse paragraph header properties from this record
-                    let new_para = Paragraph::from_header_record(&record)
+                    let mut new_para = Paragraph::from_header_record(&record)
                         .unwrap_or_default();
+                    new_para.in_table = is_cell;
                     current_paragraph = Some(new_para);
                 }
 
@@ -103,6 +118,7 @@ impl BodyTextParser {
                 Some(HwpTag::PageHide) => {
                     if let Some(ref mut para) = current_paragraph {
                         para.table_data = Table::from_record(&record).ok();
+                        table_level = Some(record.header.level);
                     }
                 }
 
@@ -112,10 +128,21 @@ impl BodyTextParser {
                 // ============================================================
 
                 Some(HwpTag::ParaHeader) => {
+                    let is_cell = if let Some(tl) = table_level {
+                        if record.header.level <= tl {
+                            table_level = None;
+                            false
+                        } else {
+                            true
+                        }
+                    } else {
+                        false
+                    };
                     if let Some(para) = current_paragraph.take() {
                         current_section.paragraphs.push(para);
                     }
-                    if let Ok(para) = Paragraph::from_header_record(&record) {
+                    if let Ok(mut para) = Paragraph::from_header_record(&record) {
+                        para.in_table = is_cell;
                         current_paragraph = Some(para);
                     }
                 }
@@ -159,6 +186,7 @@ impl BodyTextParser {
                 Some(HwpTag::Table) => {
                     if let Some(ref mut para) = current_paragraph {
                         para.table_data = Table::from_record(&record).ok();
+                        table_level = Some(record.header.level);
                     }
                 }
 

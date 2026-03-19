@@ -31,6 +31,8 @@ pub struct Paragraph {
     pub text_box_data: Option<crate::model::text_box::TextBox>,
     // Store hyperlinks for this paragraph
     pub hyperlinks: Vec<crate::model::hyperlink::Hyperlink>,
+    /// True if this paragraph is inside a table cell (should not be rendered standalone)
+    pub in_table: bool,
 }
 
 impl Paragraph {

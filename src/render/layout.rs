@@ -100,6 +100,11 @@ impl<'a> LayoutEngine<'a> {
 
         // Layout each paragraph
         for paragraph in &section.paragraphs {
+            // Skip cell sub-paragraphs (rendered inside tables, not standalone)
+            if paragraph.in_table {
+                continue;
+            }
+
             if let Some(rendered_para) =
                 self.layout_paragraph(paragraph, content_x, current_y, content_width)
             {

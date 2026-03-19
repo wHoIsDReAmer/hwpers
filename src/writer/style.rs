@@ -751,6 +751,7 @@ impl<'a> TableBuilder<'a> {
                     picture_data: None,
                     text_box_data: None,
                     hyperlinks: Vec::new(),
+                    in_table: false,
                 };
                 cell_paragraphs.push(paragraph);
             }
@@ -782,6 +783,7 @@ impl<'a> TableBuilder<'a> {
             picture_data: None,
             text_box_data: None,
             hyperlinks: Vec::new(),
+            in_table: false,
         };
 
         // Add the table paragraph to the document
