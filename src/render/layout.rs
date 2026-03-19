@@ -79,11 +79,9 @@ impl<'a> LayoutEngine<'a> {
     fn layout_section(&self, section: &Section, page_num: &mut u32) -> Vec<RenderedPage> {
         let mut pages = Vec::new();
 
-        // Get page definition
-        let page_def = section
-            .page_def
-            .as_ref()
-            .expect("Section must have page definition");
+        // Get page definition (fallback to A4 default)
+        let default_page_def = crate::model::PageDef::new_default();
+        let page_def = section.page_def.as_ref().unwrap_or(&default_page_def);
 
         let mut current_page = RenderedPage {
             width: page_def.width,
@@ -147,10 +145,12 @@ impl<'a> LayoutEngine<'a> {
             return None;
         }
 
-        // Get paragraph shape
+        // Get paragraph shape (fallback to default if not found)
+        let default_para_shape = crate::model::ParaShape::new_default();
         let para_shape = self
             .document
-            .get_para_shape(paragraph.para_shape_id as usize)?;
+            .get_para_shape(paragraph.para_shape_id as usize)
+            .unwrap_or(&default_para_shape);
 
         // Calculate paragraph margins
         let para_x = x + para_shape.left_margin;

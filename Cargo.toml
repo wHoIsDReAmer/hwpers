@@ -24,9 +24,9 @@ flate2 = "1.0"
 encoding_rs = "0.8"
 byteorder = "1.5"
 thiserror = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["serde", "wasmbind", "clock"] }
 serde = { version = "1.0", features = ["derive"] }
-zip = "2.2"
+zip = { version = "2.2", default-features = false, features = ["deflate", "time"] }
 quick-xml = { version = "0.37", features = ["serialize"] }
 aes = "0.8"
 ecb = "0.1"
