@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::model::{
     CtrlHeader, ListHeader, PageDef, ParaCharShape, ParaLineSeg, ParaText, Paragraph, Section,
-    SectionDef,
+    SectionDef, Table,
 };
 use crate::parser::record::{HwpTag, Record};
 use crate::reader::StreamReader;
@@ -110,6 +110,13 @@ impl BodyTextParser {
                 Some(HwpTag::CtrlHeader) => {
                     if let Some(ref mut para) = current_paragraph {
                         para.ctrl_header = CtrlHeader::from_record(&record).ok();
+                    }
+                }
+
+                // Table (0x5B) - Table metadata (rows, cols, cells)
+                Some(HwpTag::Table) => {
+                    if let Some(ref mut para) = current_paragraph {
+                        para.table_data = Table::from_record(&record).ok();
                     }
                 }
 
