@@ -332,7 +332,7 @@ impl HwpWriter {
                 picture_data: None,
                 text_box_data: None,
                 hyperlinks: Vec::new(),
-            in_table: false,
+                in_table: false,
             };
 
             // Add paragraph to current section

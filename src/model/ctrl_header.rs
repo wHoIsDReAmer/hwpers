@@ -81,7 +81,7 @@ pub enum ControlType {
 impl ControlType {
     pub fn from_ctrl_id(ctrl_id: u32) -> Self {
         match ctrl_id {
-            0x5442 | 0x74626C20 => Self::Table,      // 'TB' or 'tbl '
+            0x5442 | 0x74626C20 => Self::Table,    // 'TB' or 'tbl '
             0x6F73 => Self::Gso,                   // 'so'
             0x7874 => Self::TextBox,               // 'tx'
             0x7165 => Self::Equation,              // 'eq'

@@ -277,10 +277,26 @@ impl Table {
         let cell_spacing = reader.read_u16()?;
 
         // HWP 5.0 margins are u16, not i32
-        let left_margin = if reader.remaining() >= 2 { reader.read_u16()? as i32 } else { 0 };
-        let right_margin = if reader.remaining() >= 2 { reader.read_u16()? as i32 } else { 0 };
-        let top_margin = if reader.remaining() >= 2 { reader.read_u16()? as i32 } else { 0 };
-        let bottom_margin = if reader.remaining() >= 2 { reader.read_u16()? as i32 } else { 0 };
+        let left_margin = if reader.remaining() >= 2 {
+            reader.read_u16()? as i32
+        } else {
+            0
+        };
+        let right_margin = if reader.remaining() >= 2 {
+            reader.read_u16()? as i32
+        } else {
+            0
+        };
+        let top_margin = if reader.remaining() >= 2 {
+            reader.read_u16()? as i32
+        } else {
+            0
+        };
+        let bottom_margin = if reader.remaining() >= 2 {
+            reader.read_u16()? as i32
+        } else {
+            0
+        };
 
         // Remaining data: row sizes (rows * u16), border fill ID, etc.
         // Cell data comes from LIST_HEADER records, not parsed here.
