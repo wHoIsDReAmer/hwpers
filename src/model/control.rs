@@ -118,6 +118,8 @@ pub struct TableCell {
     pub paragraph_list_id: Option<u32>,
     /// Cell address for easier reference (row, col)
     pub cell_address: (u16, u16),
+    /// Raw hex dump of record data for debugging
+    pub debug_hex: String,
 }
 
 impl Table {
@@ -173,6 +175,7 @@ impl Table {
             field_name: format!("cell_{}_{}", row, col),
             paragraph_list_id: None,
             cell_address: (row, col),
+            debug_hex: String::new(),
         };
 
         self.add_cell(row, col, cell);
@@ -267,6 +270,21 @@ impl TableCell {
         let bottom_margin = reader.read_u16()?;
         let border_fill_id = reader.read_u16()?;
 
+        // Build hex dump for debugging
+        let hex: String = record
+            .data
+            .iter()
+            .take(48)
+            .enumerate()
+            .map(|(i, b)| {
+                if i > 0 && i % 16 == 0 {
+                    format!("\n  {:02X}", b)
+                } else {
+                    format!("{:02X} ", b)
+                }
+            })
+            .collect();
+
         Ok(Self {
             list_header_id: 0,
             col_span,
@@ -282,6 +300,7 @@ impl TableCell {
             field_name: String::new(),
             paragraph_list_id: None,
             cell_address: (row_addr, col_addr),
+            debug_hex: hex,
         })
     }
 
@@ -301,6 +320,7 @@ impl TableCell {
             field_name: format!("Cell{}x{}", width / 100, height / 100),
             paragraph_list_id: None,
             cell_address: (0, 0),
+            debug_hex: String::new(),
         }
     }
 }
