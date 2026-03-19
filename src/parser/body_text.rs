@@ -45,9 +45,11 @@ impl BodyTextParser {
                         current_section.section_def = SectionDef::from_record(&record).ok();
                         first_section = false;
                     }
-                    // Push previous paragraph and start a new one
+                    // Push previous paragraph (skip if inside table - cell sub-paragraphs)
                     if let Some(para) = current_paragraph.take() {
-                        current_section.paragraphs.push(para);
+                        if table_para_idx.is_none() {
+                            current_section.paragraphs.push(para);
+                        }
                     }
                     // Parse paragraph header properties from this record
                     let new_para = Paragraph::from_header_record(&record)
@@ -176,7 +178,9 @@ impl BodyTextParser {
 
                 Some(HwpTag::ParaHeader) => {
                     if let Some(para) = current_paragraph.take() {
-                        current_section.paragraphs.push(para);
+                        if table_para_idx.is_none() {
+                            current_section.paragraphs.push(para);
+                        }
                     }
                     if let Ok(para) = Paragraph::from_header_record(&record) {
                         current_paragraph = Some(para);
