@@ -23,8 +23,10 @@ impl BodyTextParser {
         let mut current_paragraph: Option<Paragraph> = None;
 
         let mut first_section = true;
-        // Track table context via record level
-        let mut table_level: Option<u8> = None;
+        // Track table context: count cells to know when we're inside a table
+        let mut in_table_context = false;
+        let mut table_cells_remaining: usize = 0;
+        let mut saw_list_header = false;
 
         while reader.remaining() >= 4 {
             // Need at least 4 bytes for record header
@@ -44,14 +46,17 @@ impl BodyTextParser {
                         first_section = false;
                     }
                     // Check if this paragraph is inside a table cell
-                    let is_cell = if let Some(tl) = table_level {
-                        if record.header.level <= tl {
-                            // Same or shallower level = no longer in table
-                            table_level = None;
-                            false
-                        } else {
-                            true
+                    let is_cell = if in_table_context && saw_list_header {
+                        // First paragraph after a LIST_HEADER = cell sub-paragraph
+                        saw_list_header = false;
+                        table_cells_remaining = table_cells_remaining.saturating_sub(1);
+                        if table_cells_remaining == 0 {
+                            in_table_context = false;
                         }
+                        true
+                    } else if in_table_context {
+                        // Additional paragraph within the same cell
+                        true
                     } else {
                         false
                     };
@@ -104,6 +109,9 @@ impl BodyTextParser {
 
                 // Tag 0x48 (HWPTAG_LIST_HEADER) - enum: HiddenComment
                 Some(HwpTag::HiddenComment) => {
+                    if in_table_context {
+                        saw_list_header = true;
+                    }
                     if let Some(ref mut para) = current_paragraph {
                         para.list_header = ListHeader::from_record(&record).ok();
                     }
@@ -117,8 +125,13 @@ impl BodyTextParser {
                 // Tag 0x4D (HWPTAG_TABLE) - enum: PageHide
                 Some(HwpTag::PageHide) => {
                     if let Some(ref mut para) = current_paragraph {
-                        para.table_data = Table::from_record(&record).ok();
-                        table_level = Some(record.header.level);
+                        if let Ok(table) = Table::from_record(&record) {
+                            let cells = (table.rows as usize) * (table.cols as usize);
+                            para.table_data = Some(table);
+                            in_table_context = true;
+                            table_cells_remaining = cells;
+                            saw_list_header = false;
+                        }
                     }
                 }
 
@@ -128,13 +141,15 @@ impl BodyTextParser {
                 // ============================================================
 
                 Some(HwpTag::ParaHeader) => {
-                    let is_cell = if let Some(tl) = table_level {
-                        if record.header.level <= tl {
-                            table_level = None;
-                            false
-                        } else {
-                            true
+                    let is_cell = if in_table_context && saw_list_header {
+                        saw_list_header = false;
+                        table_cells_remaining = table_cells_remaining.saturating_sub(1);
+                        if table_cells_remaining == 0 {
+                            in_table_context = false;
                         }
+                        true
+                    } else if in_table_context {
+                        true
                     } else {
                         false
                     };
@@ -176,6 +191,9 @@ impl BodyTextParser {
                     }
                 }
                 Some(HwpTag::ListHeader) => {
+                    if in_table_context {
+                        saw_list_header = true;
+                    }
                     if let Some(ref mut para) = current_paragraph {
                         para.list_header = ListHeader::from_record(&record).ok();
                     }
@@ -185,8 +203,13 @@ impl BodyTextParser {
                 }
                 Some(HwpTag::Table) => {
                     if let Some(ref mut para) = current_paragraph {
-                        para.table_data = Table::from_record(&record).ok();
-                        table_level = Some(record.header.level);
+                        if let Ok(table) = Table::from_record(&record) {
+                            let cells = (table.rows as usize) * (table.cols as usize);
+                            para.table_data = Some(table);
+                            in_table_context = true;
+                            table_cells_remaining = cells;
+                            saw_list_header = false;
+                        }
                     }
                 }
 
