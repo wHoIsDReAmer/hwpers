@@ -388,11 +388,42 @@ impl<'a> LayoutEngine<'a> {
     fn calculate_text_width(&self, text: &str, char_shape: Option<&CharShape>) -> i32 {
         let font_size = char_shape.map(|cs| cs.base_size).unwrap_or(1000);
 
-        // Approximate width calculation
-        // In reality, this would use font metrics
-        let char_count = text.chars().count() as i32;
-        let avg_char_width = font_size / 2; // Rough approximation
+        // CJK/Korean full-width characters need full font_size width,
+        // ASCII/Latin half-width characters use font_size / 2
+        let mut total_width = 0i32;
+        for ch in text.chars() {
+            if is_fullwidth(ch) {
+                total_width += font_size;
+            } else {
+                total_width += font_size / 2;
+            }
+        }
 
-        char_count * avg_char_width
+        total_width
     }
+}
+
+/// Returns true for CJK / full-width characters that occupy a full em-width
+fn is_fullwidth(ch: char) -> bool {
+    let cp = ch as u32;
+    // CJK Unified Ideographs
+    (0x4E00..=0x9FFF).contains(&cp)
+    // Hangul Syllables
+    || (0xAC00..=0xD7AF).contains(&cp)
+    // Hangul Jamo
+    || (0x1100..=0x11FF).contains(&cp)
+    // Hangul Compatibility Jamo
+    || (0x3130..=0x318F).contains(&cp)
+    // CJK Compatibility Ideographs
+    || (0xF900..=0xFAFF).contains(&cp)
+    // CJK Extension A
+    || (0x3400..=0x4DBF).contains(&cp)
+    // Fullwidth Forms
+    || (0xFF01..=0xFF60).contains(&cp)
+    // CJK Symbols and Punctuation
+    || (0x3000..=0x303F).contains(&cp)
+    // Katakana / Hiragana
+    || (0x3040..=0x30FF).contains(&cp)
+    // CJK Extension B+
+    || (0x20000..=0x2FA1F).contains(&cp)
 }
