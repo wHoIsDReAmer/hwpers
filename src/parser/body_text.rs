@@ -37,22 +37,24 @@ impl BodyTextParser {
                     current_section.page_def = PageDef::from_record(&record).ok();
                 }
 
-                // SectionDefine (0x42) - Actually marks paragraph start in this document
+                // Tag 0x42 (HWPTAG_PARA_HEADER) - Paragraph header with properties
                 Some(HwpTag::SectionDefine) => {
-                    // First one is the actual section definition
                     if first_section {
+                        // First record may be section definition
                         current_section.section_def = SectionDef::from_record(&record).ok();
                         first_section = false;
-                    } else {
-                        // Subsequent ones mark new paragraphs
-                        if let Some(para) = current_paragraph.take() {
-                            current_section.paragraphs.push(para);
-                        }
-                        current_paragraph = Some(Paragraph::default());
                     }
+                    // Push previous paragraph and start a new one
+                    if let Some(para) = current_paragraph.take() {
+                        current_section.paragraphs.push(para);
+                    }
+                    // Parse paragraph header properties from this record
+                    let new_para = Paragraph::from_header_record(&record)
+                        .unwrap_or_default();
+                    current_paragraph = Some(new_para);
                 }
 
-                // Tag 0x43 - Contains text content
+                // Tag 0x43 (HWPTAG_PARA_TEXT) - Paragraph text content
                 Some(HwpTag::ColumnDefine) => {
                     if let Some(ref mut para) = current_paragraph {
                         if let Ok(text) = ParaText::from_record(&record) {
@@ -61,21 +63,17 @@ impl BodyTextParser {
                     }
                 }
 
-                // TableControl (0x44) - Contains paragraph properties
+                // Tag 0x44 (HWPTAG_PARA_CHAR_SHAPE) - Character shape positions
                 Some(HwpTag::TableControl) => {
                     if let Some(ref mut para) = current_paragraph {
-                        // Try to parse as paragraph header
-                        if let Ok(new_para) = Paragraph::from_header_record(&record) {
-                            // Copy properties from parsed paragraph
-                            para.control_mask = new_para.control_mask;
-                            para.para_shape_id = new_para.para_shape_id;
-                            para.style_id = new_para.style_id;
-                            para.column_type = new_para.column_type;
-                            para.char_shape_count = new_para.char_shape_count;
-                            para.range_tag_count = new_para.range_tag_count;
-                            para.line_align_count = new_para.line_align_count;
-                            para.instance_id = new_para.instance_id;
-                        }
+                        para.char_shapes = ParaCharShape::from_record(&record).ok();
+                    }
+                }
+
+                // Tag 0x45 (HWPTAG_PARA_LINE_SEG) - Line segment info
+                Some(HwpTag::SheetControl) => {
+                    if let Some(ref mut para) = current_paragraph {
+                        para.line_segments = ParaLineSeg::from_record(&record).ok();
                     }
                 }
 
