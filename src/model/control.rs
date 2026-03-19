@@ -242,21 +242,21 @@ impl Table {
 
 impl TableCell {
     /// Parse cell data from a LIST_HEADER record in table context.
-    /// HWP 5.0 cell LIST_HEADER: nPara(u16) + properties(u32) + colAddr(u16) + rowAddr(u16)
+    /// HWP 5.0 cell LIST_HEADER: nPara(i32) + properties(u32) + colAddr(u16) + rowAddr(u16)
     /// + colSpan(u16) + rowSpan(u16) + width(u32) + height(u32) + margins(u16×4) + borderFillId(u16)
     pub fn from_list_header_record(
         record: &crate::parser::record::Record,
     ) -> crate::error::Result<Self> {
         let mut reader = record.data_reader();
 
-        if reader.remaining() < 32 {
+        if reader.remaining() < 34 {
             return Err(crate::error::HwpError::ParseError(format!(
                 "Cell LIST_HEADER too small: {} bytes",
                 reader.remaining()
             )));
         }
 
-        let _n_para = reader.read_u16()?;
+        let _n_para = reader.read_i32()?;
         let _properties = reader.read_u32()?;
         let col_addr = reader.read_u16()?;
         let row_addr = reader.read_u16()?;
