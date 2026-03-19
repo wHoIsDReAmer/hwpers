@@ -116,33 +116,15 @@ impl ParaText {
             while i < chars.len() {
                 let ch = chars[i];
 
-                // Check for control sequences
-                if ch == 0x0002 && i + 1 < chars.len() {
-                    // This might be a control sequence, check what follows
-                    let next = chars[i + 1];
-                    if next == 0x6364 || next == 0x6C64 {
-                        // Skip this metadata sequence
-                        // Look for the end (0x0000 0x0000 pattern)
-                        while i < chars.len()
-                            && !(i + 1 < chars.len() && chars[i] == 0 && chars[i + 1] == 0)
-                        {
-                            i += 1;
-                        }
-                        // Skip the zeros
-                        while i < chars.len() && chars[i] == 0 {
-                            i += 1;
-                        }
-                        continue;
-                    }
-                }
-
-                // Process normal characters
+                // Process characters
                 match ch {
                     0x0000 => {
                         // Skip null characters
                     }
-                    0x0001..=0x0008 => {
-                        // Skip other control characters
+                    0x0001..=0x0008 | 0x000B | 0x000C => {
+                        // HWP extended control characters: 8 UTF-16 words total
+                        // (1 control char + 7 parameter words). Skip the 7 params.
+                        i += 7;
                     }
                     0x0009 => {
                         // Tab character - check if this is followed by form field markers
@@ -215,27 +197,27 @@ impl ParaText {
             }
         } else {
             // Standard text processing for other tags
-            for &ch in &chars {
+            let mut i = 0;
+            while i < chars.len() {
+                let ch = chars[i];
                 match ch {
-                    0x0000..=0x001F => {
-                        // Control characters
-                        match ch {
-                            0x000A => content.push('\n'), // Line feed
-                            0x000D => content.push('\r'), // Carriage return
-                            0x0009 => content.push('\t'), // Tab
-                            _ => {}                       // Skip other control characters
-                        }
+                    0x0000 => {}
+                    0x0001..=0x0008 | 0x000B | 0x000C => {
+                        // HWP extended controls: skip 7 parameter words
+                        i += 7;
                     }
-                    0xF020..=0xF07F => {
-                        // Extended control characters - skip for now
-                    }
+                    0x0009 => content.push('\t'),
+                    0x000A => content.push('\n'),
+                    0x000D => content.push('\r'),
+                    0x000E..=0x001F => {} // Single-char controls, skip
+                    0xF020..=0xF07F => {} // Extended control characters
                     _ => {
-                        // Regular characters
                         if let Some(unicode_char) = std::char::from_u32(ch as u32) {
                             content.push(unicode_char);
                         }
                     }
                 }
+                i += 1;
             }
         }
 
