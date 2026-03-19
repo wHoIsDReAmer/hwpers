@@ -35,18 +35,24 @@ impl Paragraph {
     pub fn from_header_record(record: &Record) -> Result<Self> {
         let mut reader = record.data_reader();
 
-        // For tag 0x42, we have a simpler structure
-        if record.tag_id() == 0x42 {
-            // This is a minimal paragraph header
+        // HWP 5.0 HWPTAG_PARA_HEADER format:
+        // u32: nChars (text character count)
+        // u32: controlMask
+        // u16: paraShapeId
+        // u8:  styleId
+        // u8:  divideType (column type)
+        // u16: nCharShapeRef
+        // u16: nRangeTag
+        // u16: nLineAligns
+        // u32: instanceId
+        // Total: 22 bytes minimum
+
+        if reader.remaining() < 22 {
+            // Not enough data for full paragraph header, return default
             return Ok(Self::default());
         }
 
-        // Standard paragraph header (tag 0x50)
-        if reader.remaining() < 18 {
-            return Err(crate::error::HwpError::ParseError(
-                "Insufficient data for paragraph header".to_string(),
-            ));
-        }
+        let _n_chars = reader.read_u32()?; // text character count (skip)
 
         Ok(Self {
             control_mask: reader.read_u32()?,
