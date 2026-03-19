@@ -238,6 +238,53 @@ impl Table {
 }
 
 impl TableCell {
+    /// Parse cell data from a LIST_HEADER record in table context.
+    /// HWP 5.0 cell LIST_HEADER: nPara(u16) + properties(u32) + colAddr(u16) + rowAddr(u16)
+    /// + colSpan(u16) + rowSpan(u16) + width(u32) + height(u32) + margins(u16×4) + borderFillId(u16)
+    pub fn from_list_header_record(
+        record: &crate::parser::record::Record,
+    ) -> crate::error::Result<Self> {
+        let mut reader = record.data_reader();
+
+        if reader.remaining() < 32 {
+            return Err(crate::error::HwpError::ParseError(format!(
+                "Cell LIST_HEADER too small: {} bytes",
+                reader.remaining()
+            )));
+        }
+
+        let _n_para = reader.read_u16()?;
+        let _properties = reader.read_u32()?;
+        let col_addr = reader.read_u16()?;
+        let row_addr = reader.read_u16()?;
+        let col_span = reader.read_u16()?;
+        let row_span = reader.read_u16()?;
+        let width = reader.read_u32()?;
+        let height = reader.read_u32()?;
+        let left_margin = reader.read_u16()?;
+        let right_margin = reader.read_u16()?;
+        let top_margin = reader.read_u16()?;
+        let bottom_margin = reader.read_u16()?;
+        let border_fill_id = reader.read_u16()?;
+
+        Ok(Self {
+            list_header_id: 0,
+            col_span,
+            row_span,
+            width,
+            height,
+            left_margin,
+            right_margin,
+            top_margin,
+            bottom_margin,
+            border_fill_id,
+            text_width: width.saturating_sub((left_margin + right_margin) as u32),
+            field_name: String::new(),
+            paragraph_list_id: None,
+            cell_address: (row_addr, col_addr),
+        })
+    }
+
     pub fn new_default(width: u32, height: u32) -> Self {
         Self {
             list_header_id: 0,

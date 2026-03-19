@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::model::{
     CtrlHeader, ListHeader, PageDef, ParaCharShape, ParaLineSeg, ParaText, Paragraph, Section,
-    SectionDef, Table,
+    SectionDef, Table, TableCell,
 };
 use crate::parser::record::{HwpTag, Record};
 use crate::reader::StreamReader;
@@ -23,10 +23,11 @@ impl BodyTextParser {
         let mut current_paragraph: Option<Paragraph> = None;
         let mut first_section = true;
 
-        // Table context tracking: cell counter to mark sub-paragraphs as in_table
+        // Table context tracking
         let mut in_table_context = false;
         let mut table_cells_remaining: usize = 0;
         let mut saw_list_header = false;
+        let mut table_para_pushed = false; // true after table paragraph is pushed to section
 
         while reader.remaining() >= 4 {
             let record = match Record::parse(&mut reader) {
@@ -54,6 +55,9 @@ impl BodyTextParser {
                         &mut saw_list_header,
                     );
                     if let Some(para) = current_paragraph.take() {
+                        if para.table_data.is_some() {
+                            table_para_pushed = true;
+                        }
                         current_section.paragraphs.push(para);
                     }
                     let mut new_para = Paragraph::from_header_record(&record).unwrap_or_default();
@@ -91,6 +95,14 @@ impl BodyTextParser {
                 Some(HwpTag::HiddenComment) => {
                     if in_table_context {
                         saw_list_header = true;
+                        if let Ok(cell) = TableCell::from_list_header_record(&record) {
+                            add_cell_to_table(
+                                &mut current_paragraph,
+                                &mut current_section,
+                                table_para_pushed,
+                                cell,
+                            );
+                        }
                     }
                     if let Some(ref mut para) = current_paragraph {
                         para.list_header = ListHeader::from_record(&record).ok();
@@ -112,6 +124,7 @@ impl BodyTextParser {
                                 &mut table_cells_remaining,
                                 &mut saw_list_header,
                             );
+                            table_para_pushed = false;
                             para.table_data = Some(table);
                         }
                     }
@@ -125,6 +138,9 @@ impl BodyTextParser {
                         &mut saw_list_header,
                     );
                     if let Some(para) = current_paragraph.take() {
+                        if para.table_data.is_some() {
+                            table_para_pushed = true;
+                        }
                         current_section.paragraphs.push(para);
                     }
                     if let Ok(mut para) = Paragraph::from_header_record(&record) {
@@ -164,6 +180,14 @@ impl BodyTextParser {
                 Some(HwpTag::ListHeader) => {
                     if in_table_context {
                         saw_list_header = true;
+                        if let Ok(cell) = TableCell::from_list_header_record(&record) {
+                            add_cell_to_table(
+                                &mut current_paragraph,
+                                &mut current_section,
+                                table_para_pushed,
+                                cell,
+                            );
+                        }
                     }
                     if let Some(ref mut para) = current_paragraph {
                         para.list_header = ListHeader::from_record(&record).ok();
@@ -181,6 +205,7 @@ impl BodyTextParser {
                                 &mut table_cells_remaining,
                                 &mut saw_list_header,
                             );
+                            table_para_pushed = false;
                             para.table_data = Some(table);
                         }
                     }
@@ -215,6 +240,32 @@ fn check_table_cell_state(
         true
     } else {
         *in_table_context
+    }
+}
+
+/// Add a parsed cell to the current table paragraph.
+/// If the table paragraph is still current_paragraph, add directly.
+/// If it was already pushed to section, find it there.
+fn add_cell_to_table(
+    current_paragraph: &mut Option<Paragraph>,
+    current_section: &mut Section,
+    table_para_pushed: bool,
+    cell: TableCell,
+) {
+    if !table_para_pushed {
+        if let Some(ref mut para) = current_paragraph {
+            if let Some(ref mut table) = para.table_data {
+                table.cells.push(cell);
+            }
+        }
+    } else {
+        // Find the last paragraph with table_data in the section
+        for para in current_section.paragraphs.iter_mut().rev() {
+            if let Some(ref mut table) = para.table_data {
+                table.cells.push(cell);
+                break;
+            }
+        }
     }
 }
 
