@@ -32,11 +32,6 @@ impl BodyTextParser {
             };
 
             match HwpTag::from_u16(record.tag_id()) {
-                // Page Definition - only appears once at the beginning
-                Some(HwpTag::PageDef) => {
-                    current_section.page_def = PageDef::from_record(&record).ok();
-                }
-
                 // Tag 0x42 (HWPTAG_PARA_HEADER) - Paragraph header with properties
                 Some(HwpTag::SectionDefine) => {
                     if first_section {
@@ -75,7 +70,45 @@ impl BodyTextParser {
                     // Intentionally skipped - let layout engine calculate lines dynamically
                 }
 
-                // Standard paragraph records (if they exist)
+                // ============================================================
+                // Body text tags at CORRECT HWP 5.0 spec offsets (0x46-0x4D)
+                // The HwpTag enum names don't match their body text function
+                // because the same IDs have different meanings in DocInfo.
+                // ============================================================
+
+                // Tag 0x46 (HWPTAG_PARA_RANGE_TAG) - enum: none (falls to raw match below)
+
+                // Tag 0x47 (HWPTAG_CTRL_HEADER) - enum: LineInfo
+                Some(HwpTag::LineInfo) => {
+                    if let Some(ref mut para) = current_paragraph {
+                        para.ctrl_header = CtrlHeader::from_record(&record).ok();
+                    }
+                }
+
+                // Tag 0x48 (HWPTAG_LIST_HEADER) - enum: HiddenComment
+                Some(HwpTag::HiddenComment) => {
+                    if let Some(ref mut para) = current_paragraph {
+                        para.list_header = ListHeader::from_record(&record).ok();
+                    }
+                }
+
+                // Tag 0x49 (HWPTAG_PAGE_DEF) - enum: HeaderFooter
+                Some(HwpTag::HeaderFooter) => {
+                    current_section.page_def = PageDef::from_record(&record).ok();
+                }
+
+                // Tag 0x4D (HWPTAG_TABLE) - enum: PageHide
+                Some(HwpTag::PageHide) => {
+                    if let Some(ref mut para) = current_paragraph {
+                        para.table_data = Table::from_record(&record).ok();
+                    }
+                }
+
+                // ============================================================
+                // "High" enum tag IDs (0x50+) - these may appear in some files
+                // with different tag numbering schemes.
+                // ============================================================
+
                 Some(HwpTag::ParaHeader) => {
                     if let Some(para) = current_paragraph.take() {
                         current_section.paragraphs.push(para);
@@ -83,7 +116,6 @@ impl BodyTextParser {
                     if let Ok(para) = Paragraph::from_header_record(&record) {
                         current_paragraph = Some(para);
                     }
-                    // Skip invalid paragraph headers
                 }
                 Some(HwpTag::ParaText) => {
                     if let Some(ref mut para) = current_paragraph {
@@ -100,11 +132,13 @@ impl BodyTextParser {
                         para.line_segments = ParaLineSeg::from_record(&record).ok();
                     }
                 }
-
-                // Control Records
-                Some(HwpTag::ListHeader) => {
+                Some(HwpTag::ParaRangeTag) => {
                     if let Some(ref mut para) = current_paragraph {
-                        para.list_header = ListHeader::from_record(&record).ok();
+                        if let Ok(hyperlink) =
+                            crate::model::hyperlink::Hyperlink::from_record(&record)
+                        {
+                            para.hyperlinks.push(hyperlink);
+                        }
                     }
                 }
                 Some(HwpTag::CtrlHeader) => {
@@ -112,23 +146,17 @@ impl BodyTextParser {
                         para.ctrl_header = CtrlHeader::from_record(&record).ok();
                     }
                 }
-
-                // Table (0x5B) - Table metadata (rows, cols, cells)
+                Some(HwpTag::ListHeader) => {
+                    if let Some(ref mut para) = current_paragraph {
+                        para.list_header = ListHeader::from_record(&record).ok();
+                    }
+                }
+                Some(HwpTag::PageDef) => {
+                    current_section.page_def = PageDef::from_record(&record).ok();
+                }
                 Some(HwpTag::Table) => {
                     if let Some(ref mut para) = current_paragraph {
                         para.table_data = Table::from_record(&record).ok();
-                    }
-                }
-
-                // ParaRangeTag (0x54) - Contains hyperlink information
-                Some(HwpTag::ParaRangeTag) => {
-                    if let Some(ref mut para) = current_paragraph {
-                        // Try to parse as hyperlink
-                        if let Ok(hyperlink) =
-                            crate::model::hyperlink::Hyperlink::from_record(&record)
-                        {
-                            para.hyperlinks.push(hyperlink);
-                        }
                     }
                 }
 
