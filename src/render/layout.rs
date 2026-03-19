@@ -145,7 +145,28 @@ impl<'a> LayoutEngine<'a> {
         y: i32,
         width: i32,
     ) -> Option<RenderedParagraph> {
-        let text = paragraph.text.as_ref()?.content.as_str();
+        let text = paragraph
+            .text
+            .as_ref()
+            .map(|t| t.content.as_str())
+            .unwrap_or("");
+
+        // For table paragraphs, estimate height from row count
+        if paragraph.table_data.is_some() {
+            let table = paragraph.table_data.as_ref().unwrap();
+            // Estimate: each row ~400 HWP units (~24px), minimum 1 row
+            let row_height = 400i32;
+            let estimated_height = (table.rows as i32).max(1) * row_height;
+            return Some(RenderedParagraph {
+                x,
+                y,
+                width,
+                height: estimated_height,
+                lines: Vec::new(),
+                para_shape_id: paragraph.para_shape_id,
+            });
+        }
+
         if text.is_empty() {
             return None;
         }
