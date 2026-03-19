@@ -135,7 +135,8 @@ impl<'a> LayoutEngine<'a> {
 
         // Table paragraphs: estimate height from row count
         if let Some(table) = &paragraph.table_data {
-            let row_height = 400i32;
+            // ~25px per row → 25 * 7200/96 ≈ 1875 HWP units
+            let row_height = 1875i32;
             let estimated_height = (table.rows as i32).max(1) * row_height;
             return Some(RenderedParagraph {
                 x,
